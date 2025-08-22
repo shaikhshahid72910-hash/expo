@@ -1,0 +1,294 @@
+/*MemeVerse — Single-file Expo React Native app (mock, local-only prototype)
+
+How to run locally (quick):
+1. Install Expo CLI (if you don't have it):
+   npm install --global expo-cli
+2. Create a new project:
+   expo init MemeVersePrototype
+   (choose the "blank (TypeScript)" or "blank" template — blank is fine)
+3. Replace the contents of App.js (or App.tsx) with the contents of this file.
+4. From the project folder run:
+   npm install
+   expo start
+5. Open on your phone with Expo Go or run on an emulator.
+
+Notes:
+- This is a **UI + behaviour mock** that simulates wallet, token balances, posting memes, battles, staking, etc.
+- No blockchain or backend is included — everything runs in-memory in the app for demo purposes.
+- You can extend it to integrate with a real wallet (WalletConnect / MetaMask Mobile) and smart contracts later.
+*/
+
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, View, Text, TouchableOpacity, Image, TextInput, FlatList, StyleSheet, ScrollView, Alert } from 'react-native';
+
+const defaultMemes = [
+  { id: '1', author: 'memeLord', text: 'When the airdrop drops', likes: 128, img: null },
+  { id: '2', author: 'shahid', text: 'Staked and vibing', likes: 86, img: null },
+  { id: '3', author: 'pepeFan', text: 'Pepe takeover', likes: 204, img: null },
+];
+
+export default function App(){
+  const [screen, setScreen] = useState('splash');
+  const [memes, setMemes] = useState(defaultMemes);
+  const [balance, setBalance] = useState(12500); // mock MEME tokens
+  const [staked, setStaked] = useState(0);
+  const [username, setUsername] = useState('shahid');
+  const [newMemeText, setNewMemeText] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([
+    {id:'m1', name:'memeLord', score:12460},
+    {id:'m2', name:'sara', score:11570},
+    {id:'m3', name:'memeSlyer', score:9000},
+  ]);
+
+  useEffect(()=>{
+    // quick splash timer
+    const t = setTimeout(()=> setScreen('welcome'), 1100);
+    return ()=> clearTimeout(t);
+  },[]);
+
+  function postMeme(){
+    if(!newMemeText.trim()){ Alert.alert('Write something first!'); return }
+    const id = String(Date.now());
+    const mem = { id, author: username, text: newMemeText, likes: 0, img: null };
+    setMemes([mem, ...memes]);
+    setNewMemeText('');
+    // reward small posting bonus
+    const reward = 250;
+    setBalance(b=> b + reward);
+    setNotifications(n=> [`You received ${reward} MEME for posting!`, ...n]);
+  }
+
+  function likeMeme(id){
+    setMemes(ms => ms.map(m => m.id===id ? { ...m, likes: m.likes+1 } : m));
+    // reward small amount for likes to the author (simulated)
+    const reward = 10;
+    setBalance(b=> b + reward);
+  }
+
+  function stakeAmount(amount){
+    if(amount > balance){ Alert.alert('Not enough balance'); return }
+    setBalance(b=> b-amount);
+    setStaked(s=> s + amount);
+    setNotifications(n=> [`You staked ${amount} MEME`, ...n]);
+  }
+
+  function unstakeAmount(amount){
+    if(amount > staked){ Alert.alert('Not enough staked'); return }
+    setStaked(s=> s-amount);
+    setBalance(b=> b + amount);
+    setNotifications(n=> [`You unstaked ${amount} MEME`, ...n]);
+  }
+
+  function runBattle(){
+    // pair two random memes and pick winner by likes
+    if(memes.length < 2){ Alert.alert('Not enough memes for battle'); return }
+    const a = memes[0];
+    const b = memes[1];
+    const winner = a.likes >= b.likes ? a : b;
+    const reward = 1000;
+    setNotifications(n=> [`${winner.author} won the battle and earned ${reward} MEME`, ...n]);
+    // reward to winner (mock if current user is winner)
+    if(winner.author === username) setBalance(b=> b + reward);
+  }
+
+  if(screen === 'splash'){
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.logo}>MemeVerse</Text>
+        <Text style={{opacity:0.8}}>Turn Memes into Money</Text>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'welcome'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={{padding:20}}>
+          <Text style={styles.h1}>Welcome to MemeVerse</Text>
+          <TouchableOpacity style={styles.card} onPress={()=> setScreen('feed')}>
+            <Text style={styles.cardTitle}>Create memes → Earn tokens</Text>
+            <Text>Post, stake, and trade in a playful mock demo.</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card} onPress={()=> setScreen('wallet')}>
+            <Text style={styles.cardTitle}>Wallet & Staking</Text>
+            <Text>Mock wallet to demo balances & staking.</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card} onPress={()=> setScreen('battles')}>
+            <Text style={styles.cardTitle}>Meme Battles & Leaderboards</Text>
+            <Text>Vote, battle, and climb the leaderboard.</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.ghostButton} onPress={()=> setScreen('feed')}>
+            <Text style={{color:'#fff'}}>Start Exploring</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'feed'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}>
+          <Text style={styles.h2}>Feed</Text>
+          <View style={{flexDirection:'row'}}>
+            <TouchableOpacity style={styles.topBtn} onPress={()=> setScreen('create')}><Text>Create</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.topBtn} onPress={()=> setScreen('profile')}><Text>Profile</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.topBtn} onPress={()=> setScreen('wallet')}><Text>Wallet</Text></TouchableOpacity>
+          </View>
+        </View>
+
+        <FlatList
+          data={memes}
+          keyExtractor={i=> i.id}
+          renderItem={({item})=> (
+            <View style={styles.memeCard}>
+              <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                <Text style={{fontWeight:'700'}}>{item.author}</Text>
+                <Text>{item.likes} ❤</Text>
+              </View>
+              <Text style={{marginTop:8}}>{item.text}</Text>
+              <View style={{flexDirection:'row', marginTop:10}}>
+                <TouchableOpacity style={styles.actionBtn} onPress={()=> likeMeme(item.id)}><Text>Like</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={()=> { setNotifications(n=> [`Shared ${item.id}`, ...n]); Alert.alert('Shared!'); }}><Text>Share</Text></TouchableOpacity>
+              </View>
+            </View>
+          )}
+        />
+
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={()=> setScreen('battles')} style={styles.iconBtn}><Text>Battles</Text></TouchableOpacity>
+          <TouchableOpacity onPress={()=> setScreen('feed')} style={styles.iconBtn}><Text>Home</Text></TouchableOpacity>
+          <TouchableOpacity onPress={()=> setScreen('wallet')} style={styles.iconBtn}><Text>Wallet</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'create'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}><Text style={styles.h2}>Create Meme</Text></View>
+        <View style={{padding:20}}>
+          <Text style={{marginBottom:6}}>Author: {username}</Text>
+          <TextInput placeholder="Write your meme caption..." value={newMemeText} onChangeText={setNewMemeText} style={styles.input} multiline/>
+          <TouchableOpacity style={styles.ghostButton} onPress={postMeme}><Text style={{color:'#fff'}}>Post & Earn</Text></TouchableOpacity>
+        </View>
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={()=> setScreen('feed')} style={styles.iconBtn}><Text>Back</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'wallet'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}><Text style={styles.h2}>Wallet</Text></View>
+        <View style={{padding:20}}>
+          <Text style={{fontSize:22, fontWeight:'800'}}>{balance.toLocaleString()} MEME</Text>
+          <Text style={{opacity:0.7}}>Staked: {staked.toLocaleString()} MEME</Text>
+
+          <View style={{flexDirection:'row', marginTop:16}}>
+            <TouchableOpacity style={styles.btn} onPress={()=> stakeAmount(1000)}><Text>Stake 1,000</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.btn} onPress={()=> unstakeAmount(500)}><Text>Unstake 500</Text></TouchableOpacity>
+          </View>
+
+          <View style={{marginTop:18}}>
+            <Text style={{fontWeight:'700'}}>Transactions (mock)</Text>
+            <Text style={{marginTop:6}}>1) Received 1,200 MEME</Text>
+            <Text>2) Sent 12.5 MEME</Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={()=> setScreen('feed')} style={styles.iconBtn}><Text>Home</Text></TouchableOpacity>
+          <TouchableOpacity onPress={()=> setScreen('profile')} style={styles.iconBtn}><Text>Profile</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'battles'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}><Text style={styles.h2}>Battles</Text></View>
+        <View style={{padding:20}}>
+          <Text style={{marginBottom:12}}>Vote between the two top memes:</Text>
+          <View style={styles.battleRow}>
+            <View style={styles.battleCard}><Text style={{fontWeight:'700'}}>Meme A</Text><Text>Likes: {memes[0]?.likes ?? 0}</Text></View>
+            <View style={styles.battleCard}><Text style={{fontWeight:'700'}}>Meme B</Text><Text>Likes: {memes[1]?.likes ?? 0}</Text></View>
+          </View>
+          <TouchableOpacity style={styles.ghostButton} onPress={runBattle}><Text style={{color:'#fff'}}>Run Battle (simulate)</Text></TouchableOpacity>
+
+          <View style={{marginTop:20}}>
+            <Text style={{fontWeight:'700'}}>Leaderboard</Text>
+            {leaderboard.map(l=> (
+              <View key={l.id} style={{flexDirection:'row', justifyContent:'space-between', paddingVertical:8}}>
+                <Text>{l.name}</Text>
+                <Text>{l.score.toLocaleString()}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={()=> setScreen('feed')} style={styles.iconBtn}><Text>Home</Text></TouchableOpacity>
+          <TouchableOpacity onPress={()=> setScreen('create')} style={styles.iconBtn}><Text>Create</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  if(screen === 'profile'){
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}><Text style={styles.h2}>Profile</Text></View>
+        <View style={{padding:20}}>
+          <Text style={{fontSize:18,fontWeight:'800'}}>{username}</Text>
+          <Text style={{opacity:0.7}}>Followers: 2.3K • Memes: {memes.filter(m=> m.author===username).length}</Text>
+
+          <TouchableOpacity style={styles.btn} onPress={()=> { setUsername('coolCreator'); Alert.alert('Name changed to coolCreator (demo)') }}>
+            <Text>Change Display Name (demo)</Text>
+          </TouchableOpacity>
+
+          <View style={{marginTop:20}}>
+            <Text style={{fontWeight:'700'}}>Notifications</Text>
+            {notifications.length===0 ? <Text style={{opacity:0.7, marginTop:8}}>No notifications yet</Text> : notifications.map((n,i)=> <Text key={i} style={{marginTop:6}}>• {n}</Text>)}
+          </View>
+        </View>
+
+        <View style={styles.bottomBar}>
+          <TouchableOpacity onPress={()=> setScreen('feed')} style={styles.iconBtn}><Text>Home</Text></TouchableOpacity>
+          <TouchableOpacity onPress={()=> setScreen('wallet')} style={styles.iconBtn}><Text>Wallet</Text></TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  return null;
+}
+
+const styles = StyleSheet.create({
+  container: { flex:1, backgroundColor:'#fff' },
+  center: { flex:1, alignItems:'center', justifyContent:'center' },
+  logo: { fontSize:38, fontWeight:'800', color:'#5b21b6' },
+  h1: { fontSize:28, fontWeight:'800', marginBottom:12 },
+  h2: { fontSize:20, fontWeight:'800' },
+  card: { backgroundColor:'#f3f4f6', padding:16, borderRadius:12, marginBottom:12 },
+  cardTitle: { fontWeight:'800', marginBottom:6 },
+  ghostButton: { backgroundColor:'#6d28d9', padding:12, borderRadius:10, alignItems:'center', marginTop:12 },
+  topBar: { padding:16, flexDirection:'row', justifyContent:'space-between', alignItems:'center' },
+  topBtn: { marginLeft:8, padding:8 },
+  memeCard: { padding:12, borderBottomWidth:1, borderBottomColor:'#eee' },
+  actionBtn: { padding:8, marginRight:8, backgroundColor:'#eee', borderRadius:8 },
+  bottomBar: { flexDirection:'row', justifyContent:'space-around', padding:12, borderTopWidth:1, borderTopColor:'#eee' },
+  iconBtn: { padding:10 },
+  input: { borderWidth:1, borderColor:'#ddd', padding:12, borderRadius:8, minHeight:80 },
+  btn: { backgroundColor:'#e6e6e6', padding:12, borderRadius:8, marginRight:10 },
+  battleRow: { flexDirection:'row', justifyContent:'space-between' },
+  battleCard: { flex:1, padding:12, marginRight:8, backgroundColor:'#f8fafc', borderRadius:8 }
+});
